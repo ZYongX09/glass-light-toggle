@@ -1,17 +1,22 @@
 /**
- * <glass-light-toggle> — 玻璃质感日/夜开关（Web Component）
+ * <glass-toggle> — 玻璃质感通用开关（Web Component）
  *
- * 1:1 复刻 https://experiments.thisiswhitespace.com/glass-light-toggle（原作 Zsolt Kacso）。
+ * 由 glass-light-toggle（日夜专用）泛化而来，1:1 保留原作
+ * https://experiments.thisiswhitespace.com/glass-light-toggle（Zsolt Kacso）的玻璃/折射/LED 光学。
  * 结构：CPU 端弹簧像素图形（离屏 2D canvas 光栅化）→ 作为纹理，
  *       由单个 WebGL2 片元着色器完成玻璃、折射、磨砂与 LED 散射的全部光学效果。
  * 零依赖；仅要求浏览器支持 WebGL2。
  *
- * 用法：
- *   <script type="module" src="./glass-light-toggle.js"></script>
- *   <glass-light-toggle style="width:560px;height:400px"></glass-light-toggle>
+ * 默认即「通用形态」：深色圆角底板（plinth，可嵌任意页面背景）+ 点阵电源符 +
+ * 薄荷绿(开)/冷灰(关)灯光，表面明暗固定。`preset="day-night"` 一键回到日/夜场景。
  *
- * 特性：点击 / 拖拽 / 键盘（空格、回车、左右方向键）；change / themechange 事件；
- *       checked / zoom / path / moon-color / sun-color / hint / label 属性。
+ * 用法：
+ *   <script type="module" src="./glass-toggle.js"></script>
+ *   <glass-toggle style="width:560px;height:400px"></glass-toggle>                    <!-- 通用默认 -->
+ *   <glass-toggle preset="day-night" style="width:100vw;height:100vh"></glass-toggle> <!-- 日/夜场景 -->
+ *   <glass-toggle on-icon="pause" off-icon="play" on-color="#60a5fa"></glass-toggle>  <!-- 内置图标对 -->
+ *   <glass-toggle on-icon="🌙" off-icon="☀️"></glass-toggle>                          <!-- emoji 采样 -->
+ *   <glass-toggle off-icon="....#..../...###.../..#####../.#######./#########/...###.../...###.../...###..."></glass-toggle>
  */
 
 // ---------------------------------------------------------------- layout
@@ -21,7 +26,19 @@ const KNOB_HALF = (TRACK.h - PAD * 2) / 2; // 99
 const KNOB_R = 58;
 const GRID = 17, C0 = 8, PITCH = 5.7, PSIZE = 4.6;
 
-// ---------------------------------------------------------------- icons
+// ---------------------------------------------------------------- sprites
+// 精灵 = 17×17 网格点集 {x, y, b, kind}；kind: 'lit'（常亮）| 'star'（闪烁）| 'ray'（流光）
+
+// 把任意点集的包围盒中心移到网格中心（moon/sun 为手工平衡，不走此步）
+function recenter(pts) {
+  if (!pts.length) return pts;
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const p of pts) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+  const ox = Math.round(C0 - (x0 + x1) / 2), oy = Math.round(C0 - (y0 + y1) / 2);
+  if (!ox && !oy) return pts;
+  return pts.map(p => ({ ...p, x: p.x + ox, y: p.y + oy }));
+}
+
 function buildMoon() {
   const out = [];
   for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
@@ -53,27 +70,198 @@ function buildSun() {
   return [...m.values()];
 }
 
-const MOON = buildMoon();
-const SUN = buildSun();
+// 电源符：顶部开口的圆环 + 竖杆
+function buildPower() {
+  const out = [];
+  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+    const dx = x - C0, dy = y - C0, d2 = dx * dx + dy * dy;
+    const ring = d2 <= 6.8 * 6.8 && d2 >= 5.2 * 5.2;
+    const gap = y - C0 <= -3.2 && Math.abs(dx) <= 1.6;
+    const stem = dx === 0 && dy >= -6.5 && dy <= -0.5;
+    if (stem) out.push({ x, y, b: 1, kind: 'lit' });
+    else if (ring && !gap) out.push({ x, y, b: 1, kind: 'lit' });
+  }
+  return out;
+}
 
-const angKey = c => {
-  const a = Math.atan2(c.y - C0, c.x - C0);
-  return ((a + Math.PI * 0.75 + Math.PI * 2) % (Math.PI * 2)) + Math.hypot(c.x - C0, c.y - C0) * 1e-3;
+function buildPlay() {
+  const out = [];
+  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+    const x0 = 4.5, x1 = 13.5, yTop = 3.5, yM = 8;
+    if (x < x0 || x > x1) continue;
+    const half = (1 - (x - x0) / (x1 - x0)) * (yM - yTop);
+    if (Math.abs(y - yM) <= half) out.push({ x, y, b: 1, kind: 'lit' });
+  }
+  return out;
+}
+
+function buildPause() {
+  const out = [];
+  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+    if (y >= 4 && y <= 12 && ((x >= 5 && x <= 6) || (x >= 10 && x <= 11))) out.push({ x, y, b: 1, kind: 'lit' });
+  }
+  return out;
+}
+
+function buildHeart() {
+  const out = [];
+  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+    const px = (x - 8) / 5.4, py = -(y - 9) / 5.4 + 0.12;
+    const a = px * px + py * py - 1;
+    if (a * a * a - px * px * py * py * py <= 0) out.push({ x, y, b: 1, kind: 'lit' });
+  }
+  return out;
+}
+
+function buildBell() {
+  const out = [];
+  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+    const dx = x - 8, dy = y - 8;
+    if (dy >= -7 && dy <= 4) {
+      const half = Math.min(6.8, 1.2 + Math.max(0, dy + 7) * 0.62);
+      if (Math.abs(dx) <= half) out.push({ x, y, b: 1, kind: 'lit' });
+    }
+    if (dy === -8 && Math.abs(dx) <= 1) out.push({ x, y, b: 0.8, kind: 'lit' });
+    if (dy === 5 && Math.abs(dx) <= 7) out.push({ x, y, b: 1, kind: 'lit' });
+    if (dy === 6 && Math.abs(dx) <= 5.5) out.push({ x, y, b: 0.85, kind: 'lit' });
+    if (dy === 7 && dx === 0) out.push({ x, y, b: 0.9, kind: 'star' });
+  }
+  return recenter(out);
+}
+
+function buildLock() {
+  const out = [];
+  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+    const dx = x - 8, dy = y - 8;
+    if (dy >= 0 && dy <= 6 && Math.abs(dx) <= 4.5) {
+      const keyhole = dx === 0 && dy >= 2 && dy <= 3.5;
+      out.push({ x, y, b: keyhole ? 0.15 : 1, kind: 'lit' });
+    }
+    const rr = Math.hypot(dx, dy + 4.5);
+    if (rr <= 4.4 && rr >= 2.6 && dy < 0) out.push({ x, y, b: 1, kind: 'lit' });
+  }
+  return out;
+}
+
+function buildStar() {
+  const out = [];
+  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+    const dx = x - 8, dy = 8 - y;
+    if (dx === 0 && dy === 0) { out.push({ x, y, b: 1, kind: 'lit' }); continue; }
+    const a = Math.atan2(dy, dx) + Math.PI / 2;
+    const r = Math.hypot(dx, dy);
+    const k = (((a / (Math.PI * 2)) % 1) + 1) % 1 * 5;
+    const spike = 1 - Math.abs(k - Math.round(k)) * 1.4;
+    if (r <= 2.6 + Math.max(spike, 0) * (7.2 - 2.6)) out.push({ x, y, b: 1, kind: 'lit' });
+  }
+  return out;
+}
+
+// 线段栅格化（勾/十字等线状图形）
+function fromSegments(segs, width = 1.1) {
+  const out = [];
+  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+    for (const [x0, y0, x1, y1] of segs) {
+      const vx = x1 - x0, vy = y1 - y0;
+      const t = Math.max(0, Math.min(1, ((x - x0) * vx + (y - y0) * vy) / (vx * vx + vy * vy)));
+      if (Math.hypot(x - (x0 + vx * t), y - (y0 + vy * t)) <= width) { out.push({ x, y, b: 1, kind: 'lit' }); break; }
+    }
+  }
+  return out;
+}
+
+const buildCheck = () => fromSegments([[3.5, 9, 6.5, 13], [6.5, 13, 13.5, 4]]);
+const buildPlus = () => fromSegments([[8, 2.5, 8, 13.5], [2.5, 8, 13.5, 8]]);
+
+function buildWifi() {
+  const out = [];
+  for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+    const dx = x - 8, dy = y - 13;
+    const r = Math.hypot(dx, dy);
+    if (dy < 0 && dy > -12 &&
+        ((r >= 3 && r <= 4.6) || (r >= 6.2 && r <= 7.8) || (r >= 9.4 && r <= 11))) out.push({ x, y, b: 1, kind: 'lit' });
+    if (r <= 1.4) out.push({ x, y, b: 1, kind: 'lit' });
+  }
+  return out;
+}
+
+const SPRITES = {
+  moon: buildMoon, sun: buildSun, power: buildPower, play: buildPlay, pause: buildPause,
+  heart: buildHeart, bell: buildBell, lock: buildLock, star: buildStar,
+  check: buildCheck, plus: buildPlus, wifi: buildWifi,
 };
-const rnd = (a, b) => a + Math.random() * (b - a);
 
-// Pair moon pixels with sun pixels by sweeping angle, so the morph reads as one coherent swirl.
-function pairUp() {
-  const A = [...MOON].sort((p, q) => angKey(p) - angKey(q));
-  const B = [...SUN].sort((p, q) => angKey(p) - angKey(q));
+// 像素字符串 → 点集（'#'=亮、'+'=0.55、'*'=闪烁 star、'.'/空格=空），自动居中
+function spriteFromBitmap(src) {
+  const rows = src.split('/').map(s => [...s]);
+  const out = [];
+  for (let y = 0; y < rows.length; y++) {
+    for (let x = 0; x < rows[y].length; x++) {
+      const ch = rows[y][x];
+      if (ch === '#') out.push({ x, y, b: 1, kind: 'lit' });
+      else if (ch === '+') out.push({ x, y, b: 0.55, kind: 'lit' });
+      else if (ch === '*') out.push({ x, y, b: 1, kind: 'star' });
+    }
+  }
+  return recenter(out);
+}
+
+// emoji / 短文本 → 离屏 canvas 绘制后按 17×17 采样 alpha 成点
+function spriteFromGlyph(text) {
+  const N = 64;
+  const c = document.createElement('canvas');
+  c.width = N; c.height = N;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '48px system-ui, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+  ctx.fillText(text, N / 2, N / 2 + 2);
+  const data = ctx.getImageData(0, 0, N, N).data;
+  const out = [];
+  const cell = N / GRID;
+  for (let gy = 0; gy < GRID; gy++) for (let gx = 0; gx < GRID; gx++) {
+    let a = 0;
+    for (let py = Math.floor(gy * cell); py < Math.floor((gy + 1) * cell); py++)
+      for (let px = Math.floor(gx * cell); px < Math.floor((gx + 1) * cell); px++) {
+        const al = data[(py * N + px) * 4 + 3];
+        if (al > a) a = al;
+      }
+    if (a > 48) out.push({ x: gx, y: gy, b: Math.min(1, a / 255 * 1.2), kind: 'lit' });
+  }
+  return recenter(out);
+}
+
+function resolveSprite(value) {
+  const v = (value || '').trim();
+  if (!v) return null;
+  if (SPRITES[v]) return SPRITES[v]();
+  if (v.includes('#') || v.includes('*') || v.length > 2) {
+    const s = spriteFromBitmap(v);
+    if (s.length) return s;
+    console.warn('[glass-toggle] 图标解析为空，回退 power：', v);
+    return buildPower();
+  }
+  const s = spriteFromGlyph(v);
+  if (!s.length) {
+    console.warn('[glass-toggle] 图标采样为空，回退 power：', v);
+    return buildPower();
+  }
+  return s;
+}
+
+// Pair any two sprite point sets by sweeping angle, so the morph reads as one coherent swirl.
+function pairUp(A, B) {
+  const a = [...A].sort((p, q) => angKey(p) - angKey(q));
+  const b = [...B].sort((p, q) => angKey(p) - angKey(q));
   const pairs = [];
-  const big = A.length >= B.length ? A : B, small = big === A ? B : A;
+  const big = a.length >= b.length ? a : b, small = big === a ? b : a;
   let last = -1;
   for (let i = 0; i < big.length; i++) {
     const j = Math.floor(i * small.length / big.length);
     const first = j !== last; last = j;
     const s = { ...small[j], b: first ? small[j].b : 0 };
-    pairs.push(big === A ? [big[i], s] : [s, big[i]]);
+    pairs.push(big === a ? [big[i], s] : [s, big[i]]);
   }
   return pairs.map(([a, b]) => {
     const lead = 1 - a.x / (GRID - 1); // right-hand pixels lead when travelling right
@@ -90,6 +278,12 @@ function pairUp() {
     };
   });
 }
+
+const angKey = c => {
+  const a = Math.atan2(c.y - C0, c.x - C0);
+  return ((a + Math.PI * 0.75 + Math.PI * 2) % (Math.PI * 2)) + Math.hypot(c.x - C0, c.y - C0) * 1e-3;
+};
+const rnd = (a, b) => a + Math.random() * (b - a);
 
 // ---------------------------------------------------------------- pixel canvases
 const HAS_FILTER = (() => {
@@ -125,13 +319,13 @@ uniform vec2 uC; uniform vec2 uTH; uniform float uTR;
 uniform vec2 uK; uniform vec2 uKH; uniform float uKR;
 uniform float uTheme, uTime, uLed, uLift;
 uniform vec4 uBox;
+uniform float uSurface;          // 0 = scene（全场景环境底）, 1 = plinth（圆角底板 + 透明羽化边）
 uniform sampler2D uPix, uGlow;
 
 uniform vec3 uLight;
 uniform float uTheta, uHalfW, uRefract, uFrost, uGlowAmt, uMode, uStripLen;
 uniform vec2 uStrip;
 #define AMBER uLight
-#define PEACH mix(uLight, vec3(1.0), 0.32)
 float gPixA = 0.;
 
 // One glow model for both themes. On dark, light adds. On a bright surface adding does
@@ -208,11 +402,20 @@ void main(){
   vec2 uv = praw / vp;
   float th = uTheme;
 
-  // ---- page
-  float sky = smoothstep(1.5, 0.0, length((uv - vec2(0.92, -0.08)) * vec2(1.0, 1.25)));
-  vec3 dBg = mix(vec3(0.040), vec3(0.120), sky);
-  vec3 lBg = mix(vec3(0.800), vec3(0.925), sky);
-  vec3 col = mix(dBg, lBg, th);
+  // ---- base: scene page background, or a feathered plinth plate
+  float pm = 1.0;
+  vec3 col;
+  if (uSurface < 0.5) {
+    float sky = smoothstep(1.5, 0.0, length((uv - vec2(0.92, -0.08)) * vec2(1.0, 1.25)));
+    vec3 dBg = mix(vec3(0.040), vec3(0.120), sky);
+    vec3 lBg = mix(vec3(0.800), vec3(0.925), sky);
+    col = mix(dBg, lBg, th);
+  } else {
+    float pd = sdRB(p - uC, uTH + 56., uTR + 56.);
+    pm = 1. - smoothstep(0., 26., pd);
+    col = mix(vec3(0.032), vec3(0.880), th);
+    col *= 0.92 + 0.08 * (1. - smoothstep(18., 56., pd));
+  }
 
   float st = sdRB(p - uC, uTH, uTR);
   float sh = 1. - smoothstep(-10., 34., sdRB(p - uC - vec2(0., 14.), uTH, uTR));
@@ -220,7 +423,7 @@ void main(){
   float sh2 = 1. - smoothstep(-2., 4., sdRB(p - uC - vec2(0., 1.5), uTH, uTR));
   col *= 1. - sh2 * mix(0.3, 0.08, th);
 
-  // LED spill onto the page
+  // LED spill onto the page / plate
   float ls = max(ledSd(p), 0.);
   float spill = (exp(-ls/18.)*0.5 + exp(-ls/85.)*0.34) * uLed;
   col = glow(col, spill*0.6);
@@ -285,15 +488,19 @@ void main(){
   col = glow(col, exp(-max(lsd, 0.) / 4.5) * 0.55 * uLed * (1. - lm));
 
   col += (hash(gl_FragCoord.xy + fract(uTime) * 91.7) - 0.5) * 0.022;
-  o = vec4(clamp(col, 0., 1.), 1.);
+  o = vec4(clamp(col, 0., 1.), uSurface < 0.5 ? 1.0 : pm);
 }`;
 
-// ---------------------------------------------------------------- defaults
-// Tuned values (the dev panel has been removed; these are the shipped settings).
+// ---------------------------------------------------------------- config
+// 通用默认值：开箱即一颗可嵌任意页面的中性开关；日/夜场景经 preset="day-night" 恢复。
 const DEFAULTS = {
+  surface: 'plinth',      // 'plinth' = 圆角底板 + 透明羽化边；'scene' = 全场景环境底色（占满元素盒）
+  theme: 'dark',          // 'dark' / 'light' = 固定表面明暗；'auto' = 跟随开关位置（日/夜行为）
+  onIcon: 'power',
+  offIcon: 'power',
+  onColor: '#34d399',     // 开（薄荷绿）
+  offColor: '#7c8598',    // 关（冷灰）
   path: 'glass',          // 'glass' = light strip hugs the knob, 'track' = it runs inside the container wall
-  moonColor: '#6f86ff',   // light colour in the dark (moon) state
-  sunColor: '#ffa82e',    // light colour in the light (sun) state
   intensity: 1.89,
   lightWidth: 0.92,       // strip length (rad around the glass; ×130 px along the track)
   orbit: true,            // strip travels bottom ⇄ top
@@ -304,6 +511,12 @@ const DEFAULTS = {
   burst: 0.38,
   glow: 0.64,
   stiffness: 129,
+};
+
+const PRESET_DAY_NIGHT = {
+  surface: 'scene', theme: 'auto',
+  onIcon: 'sun', offIcon: 'moon',
+  onColor: '#ffa82e', offColor: '#6f86ff',
 };
 
 const HEX_RE = /^#[0-9a-f]{6}$/i;
@@ -332,9 +545,10 @@ const SHADOW_CSS = `
   }
 `;
 
-export class GlassLightToggle extends HTMLElement {
+export class GlassToggle extends HTMLElement {
   static get observedAttributes() {
-    return ['checked', 'zoom', 'path', 'moon-color', 'sun-color', 'hint', 'label'];
+    return ['checked', 'zoom', 'path', 'theme', 'surface', 'preset',
+      'on-icon', 'off-icon', 'on-color', 'off-color', 'disabled', 'hint', 'label'];
   }
 
   constructor() {
@@ -352,6 +566,12 @@ export class GlassLightToggle extends HTMLElement {
     // ---------------------------------------------------------------- tunables
     this._P = { ...DEFAULTS };
     this._zoom = 1;
+    this._themeMode = DEFAULTS.theme;   // 'auto' | 'dark' | 'light'
+    this._surface = DEFAULTS.surface;   // 'scene' | 'plinth'
+    this._disabled = false;
+    this._iconKey = '';
+    this._sprOff = null;
+    this._sprOn = null;
 
     // ---------------------------------------------------------------- state
     this._state = {
@@ -360,7 +580,7 @@ export class GlassLightToggle extends HTMLElement {
       hover: 0, hoverT: 0, press: 0, pressT: 0, led: 1, kick: 0, dir: 1, sp: 0, spv: 0,
       pendingClick: false,
     };
-    this._PIX = pairUp();
+    this._PIX = pairUp(buildPower(), buildPower());
     this._lit = false;
     this._connected = false;
     this._visible = true; // IntersectionObserver 报告前先乐观假设可见
@@ -387,7 +607,7 @@ export class GlassLightToggle extends HTMLElement {
     this._bindInput();
     this._ro = new ResizeObserver(() => this._resize());
     this._ro.observe(this);
-    // 视口外的实例暂停整个渲染循环（多实例页面只给可见实例花 GPU/ CPU）
+    // 视口外的实例暂停整个渲染循环（多实例页面只给可见实例花 GPU/CPU）
     this._io = new IntersectionObserver(entries => {
       const vis = entries.some(e => e.isIntersecting);
       if (vis === this._visible) return;
@@ -405,7 +625,7 @@ export class GlassLightToggle extends HTMLElement {
   }
 
   // ---------------------------------------------------------------- public API
-  /** 当前是否为「开」（太阳/亮色）状态 */
+  /** 当前是否为「开」状态 */
   get checked() { return this._state.target > 0.5; }
   set checked(v) { this._setTarget(v ? 1 : 0, 0.6); }
 
@@ -416,6 +636,7 @@ export class GlassLightToggle extends HTMLElement {
   connectedCallback() {
     this._connected = true;
     this._applyLabel();
+    this._applyDisabled();
     this._resize();
     if (this._visible && this._gl) {
       this._lastT = performance.now();
@@ -437,31 +658,67 @@ export class GlassLightToggle extends HTMLElement {
         this._resize();
         break;
       }
-      case 'path':
-        this._P.path = value === 'track' ? 'track' : 'glass';
-        break;
-      case 'moon-color':
-        if (HEX_RE.test(value || '')) this._P.moonColor = value;
-        break;
-      case 'sun-color':
-        if (HEX_RE.test(value || '')) this._P.sunColor = value;
-        break;
       case 'checked': {
         const v = value !== null && value !== 'false' && value !== '0';
         if ((v ? 1 : 0) !== this._state.target) this._setTarget(v ? 1 : 0, 0.6);
         break;
       }
+      case 'disabled':
+        this._applyDisabled();
+        break;
       case 'hint':
         this._applyHintText();
         break;
       case 'label':
         this._applyLabel();
         break;
+      default:
+        // path / theme / surface / preset / on-icon / off-icon / on-color / off-color
+        this._syncConfig();
+        break;
+    }
+  }
+
+  // preset 提供基底值，显式属性优先
+  _syncConfig() {
+    const get = n => this.getAttribute(n);
+    const preset = get('preset') === 'day-night' ? PRESET_DAY_NIGHT : {};
+    const cfg = {
+      surface: get('surface') || preset.surface || DEFAULTS.surface,
+      theme: get('theme') || preset.theme || DEFAULTS.theme,
+      onIcon: get('on-icon') || preset.onIcon || DEFAULTS.onIcon,
+      offIcon: get('off-icon') || preset.offIcon || DEFAULTS.offIcon,
+      onColor: get('on-color') || preset.onColor || DEFAULTS.onColor,
+      offColor: get('off-color') || preset.offColor || DEFAULTS.offColor,
+    };
+    this._P.path = get('path') === 'track' ? 'track' : 'glass';
+    this._P.onColor = HEX_RE.test(cfg.onColor) ? cfg.onColor : DEFAULTS.onColor;
+    this._P.offColor = HEX_RE.test(cfg.offColor) ? cfg.offColor : DEFAULTS.offColor;
+    this._themeMode = ['auto', 'dark', 'light'].includes(cfg.theme) ? cfg.theme : DEFAULTS.theme;
+    this._surface = cfg.surface === 'scene' ? 'scene' : 'plinth';
+
+    const onKey = cfg.onIcon + '|' + cfg.offIcon;
+    if (onKey !== this._iconKey) {
+      this._iconKey = onKey;
+      this._sprOff = resolveSprite(cfg.offIcon) || buildPower();
+      this._sprOn = resolveSprite(cfg.onIcon) || buildPower();
+      this._PIX = pairUp(this._sprOff, this._sprOn);
+      for (const px of this._PIX) px.inited = false;
     }
   }
 
   _applyLabel() {
-    this._canvas.setAttribute('aria-label', this.getAttribute('label') || 'Glass light toggle');
+    this._canvas.setAttribute('aria-label', this.getAttribute('label') || 'Glass toggle');
+  }
+
+  _applyDisabled() {
+    const v = this.getAttribute('disabled');
+    this._disabled = v !== null && v !== 'false' && v !== '0';
+    this._canvas.setAttribute('aria-disabled', String(this._disabled));
+    if (this._disabled) {
+      this._state.hoverT = 0;
+      this._canvas.style.cursor = 'default';
+    }
   }
 
   _applyHintText() {
@@ -476,7 +733,7 @@ export class GlassLightToggle extends HTMLElement {
   }
 
   _readAttrs() {
-    for (const name of GlassLightToggle.observedAttributes) {
+    for (const name of GlassToggle.observedAttributes) {
       this.attributeChangedCallback(name, null, this.getAttribute(name));
     }
   }
@@ -541,7 +798,7 @@ export class GlassLightToggle extends HTMLElement {
       if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
       gl.useProgram(prog);
     } catch (err) {
-      console.error('[glass-light-toggle]', err);
+      console.error('[glass-toggle]', err);
       return this._fallback('着色器初始化失败');
     }
     this._gl = gl;
@@ -555,7 +812,7 @@ export class GlassLightToggle extends HTMLElement {
     gl.vertexAttribPointer(aLoc, 2, gl.FLOAT, false, 0, 0);
 
     const U = {};
-    for (const n of ['uScale', 'uMode', 'uStrip', 'uStripLen', 'uLight', 'uTheta', 'uHalfW', 'uRefract', 'uFrost', 'uGlowAmt', 'uRes', 'uDpr', 'uC', 'uTH', 'uTR', 'uK', 'uKH', 'uKR', 'uTheme', 'uTime', 'uLed', 'uLift', 'uBox', 'uPix', 'uGlow'])
+    for (const n of ['uScale', 'uMode', 'uStrip', 'uStripLen', 'uLight', 'uTheta', 'uHalfW', 'uRefract', 'uFrost', 'uGlowAmt', 'uRes', 'uDpr', 'uC', 'uTH', 'uTR', 'uK', 'uKH', 'uKR', 'uTheme', 'uTime', 'uLed', 'uLift', 'uBox', 'uSurface', 'uPix', 'uGlow'])
       U[n] = gl.getUniformLocation(prog, n);
     this._U = U;
 
@@ -691,7 +948,8 @@ export class GlassLightToggle extends HTMLElement {
     khx *= squeeze; khy *= squeeze;
     let kx = leftX + (rightX - leftX) * pc;
     if (s.p > 1) kx += over * 110; else if (s.p < 0) kx -= over * 110;
-    const theme = smooth(0.18, 0.82, pc);
+    // 表面明暗：auto 跟随开关位置；dark/light 固定
+    const theme = this._themeMode === 'auto' ? smooth(0.18, 0.82, pc) : (this._themeMode === 'light' ? 1 : 0);
 
     // Light orbit. Leaving dark (p≈0) it sweeps bottom → leading (right) side → top;
     // leaving light it continues top → left side → bottom, so it keeps circling one way.
@@ -708,7 +966,9 @@ export class GlassLightToggle extends HTMLElement {
     const HALF = Math.PI / 2;
     let theta = s.dir > 0 ? HALF - Math.PI * sp : -HALF - Math.PI * (1 - sp);
     if (!P.orbit) theta = HALF;
-    const cm = hex(P.moonColor), cs = hex(P.sunColor);
+    const cm = hex(P.offColor), cs = hex(P.onColor);
+    // 灯光色跟随开关位置（表面明暗独立）：auto 模式下与原版逐位一致
+    const colorMix = smooth(0.18, 0.82, pc);
 
     // Track mode: same story along the container wall. Dark rests on the bottom under the knob,
     // light rests on the top above it; the strip travels the long way round the end of the track.
@@ -773,8 +1033,8 @@ export class GlassLightToggle extends HTMLElement {
     // dim "unlit" icons sit underneath
     pctx.globalCompositeOperation = 'destination-over';
     if (P.trackIcons) {
-      this._drawGhost(MOON, leftX, 0.12);
-      this._drawGhost(SUN, rightX, 0.12);
+      this._drawGhost(this._sprOff, leftX, 0.12);
+      this._drawGhost(this._sprOn, rightX, 0.12);
     }
     pctx.globalCompositeOperation = 'source-over';
     pctx.globalAlpha = 1;
@@ -795,8 +1055,8 @@ export class GlassLightToggle extends HTMLElement {
     gl.uniform1f(U.uKR, Math.min(KNOB_R, khx - 1, khy - 1));
     gl.uniform1f(U.uTheme, theme);
     gl.uniform1f(U.uTime, time);
-    gl.uniform1f(U.uLed, s.led * P.intensity);
-    gl.uniform3f(U.uLight, cm[0] + (cs[0] - cm[0]) * theme, cm[1] + (cs[1] - cm[1]) * theme, cm[2] + (cs[2] - cm[2]) * theme);
+    gl.uniform1f(U.uLed, s.led * P.intensity * (this._disabled ? 0.25 : 1));
+    gl.uniform3f(U.uLight, cm[0] + (cs[0] - cm[0]) * colorMix, cm[1] + (cs[1] - cm[1]) * colorMix, cm[2] + (cs[2] - cm[2]) * colorMix);
     gl.uniform1f(U.uTheta, theta);
     gl.uniform1f(U.uHalfW, P.lightWidth);
     gl.uniform1f(U.uMode, P.path === 'track' ? 1 : 0);
@@ -807,13 +1067,16 @@ export class GlassLightToggle extends HTMLElement {
     gl.uniform1f(U.uGlowAmt, P.glow);
     gl.uniform1f(U.uLift, s.hover * (1 - s.press));
     gl.uniform4f(U.uBox, box.x, box.y, box.w, box.h);
+    gl.uniform1f(U.uSurface, this._surface === 'plinth' ? 1 : 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     if (this._hintEl) this._hintEl.style.color = theme > 0.5 ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.26)';
-    const lit = theme > 0.5;
-    if (lit !== this._lit) {
-      this._lit = lit;
-      this._emit('themechange', { lit, checked: this.checked });
+    if (this._themeMode === 'auto') {
+      const lit = theme > 0.5;
+      if (lit !== this._lit) {
+        this._lit = lit;
+        this._emit('themechange', { lit, checked: this.checked });
+      }
     }
   }
 
@@ -842,7 +1105,7 @@ export class GlassLightToggle extends HTMLElement {
       const s = this._state;
       const [lx, ly] = this._local(e);
       const [dxp, dyp] = this._toD(lx, ly);
-      const ot = this._overTrack(dxp, dyp);
+      const ot = this._overTrack(dxp, dyp) && !this._disabled;
       canvas.style.cursor = s.dragging ? 'grabbing' : ot ? 'pointer' : 'default';
       s.hoverT = ot && e.pointerType === 'mouse' ? 1 : 0;
       if (!s.dragging) return;
@@ -859,6 +1122,7 @@ export class GlassLightToggle extends HTMLElement {
     });
 
     canvas.addEventListener('pointerdown', e => {
+      if (this._disabled) return;
       const [lx, ly] = this._local(e);
       const [dxp, dyp] = this._toD(lx, ly);
       if (!this._overTrack(dxp, dyp)) return;
@@ -875,6 +1139,7 @@ export class GlassLightToggle extends HTMLElement {
     const release = () => {
       const s = this._state;
       s.pressT = 0;
+      if (this._disabled) { s.pendingClick = false; return; }
       if (s.dragging) {
         s.dragging = false;
         if (s.moved < 4) this.toggle();
@@ -887,6 +1152,7 @@ export class GlassLightToggle extends HTMLElement {
     canvas.addEventListener('pointerleave', () => { this._state.hoverT = 0; });
 
     canvas.addEventListener('keydown', e => {
+      if (this._disabled) return;
       if (e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
         e.preventDefault();
         this.toggle();
@@ -895,6 +1161,6 @@ export class GlassLightToggle extends HTMLElement {
   }
 }
 
-customElements.define('glass-light-toggle', GlassLightToggle);
+customElements.define('glass-toggle', GlassToggle);
 
-export default GlassLightToggle;
+export default GlassToggle;

@@ -1,17 +1,17 @@
 {
-  "name": "glass-light-toggle",
-  "version": "1.0.0",
+  "name": "glass-toggle",
+  "version": "1.1.0",
   "private": true,
   "license": "UNLICENSED",
-  "description": "玻璃质感日/夜开关 Web Component —— 1:1 复刻 experiments.thisiswhitespace.com/glass-light-toggle（原作 Zsolt Kacso）",
+  "description": "玻璃质感通用二态开关 Web Component —— 光学 1:1 复刻 experiments.thisiswhitespace.com/glass-light-toggle（原作 Zsolt Kacso），默认通用形态 + day-night 预设",
   "type": "module",
-  "main": "glass-light-toggle.js",
-  "module": "glass-light-toggle.js",
+  "main": "glass-toggle.js",
+  "module": "glass-toggle.js",
   "exports": {
-    ".": "./glass-light-toggle.js"
+    ".": "./glass-toggle.js"
   },
   "files": [
-    "glass-light-toggle.js",
+    "glass-toggle.js",
     "index.html",
     "README.md"
   ],
@@ -21,6 +21,7 @@
     "switch",
     "glass",
     "webgl",
-    "dark-mode"
+    "dark-mode",
+    "icon"
   ]
 }

@@ -4,14 +4,21 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0d0d0d" />
-<title>Glass Light Toggle — 组件演示</title>
+<title>&lt;glass-toggle&gt; — 通用玻璃开关演示</title>
 <style>
   html, body { margin: 0; background: #0d0d0d; }
   body { font-family: -apple-system, "SF Pro Text", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif; }
 
-  /* ---- 1:1 复刻区：组件铺满首屏，等同原页面 ---- */
+  /* ---- 首屏：日/夜预设铺满视口 ---- */
   .hero { position: relative; height: 100vh; height: 100dvh; }
-  .hero glass-light-toggle { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .hero glass-toggle { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .chip {
+    position: fixed; top: 14px; left: 16px; z-index: 2;
+    font: 500 11px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: rgba(255,255,255,0.30); pointer-events: none;
+    transition: color 0.6s ease;
+  }
+  body.light .chip { color: rgba(0,0,0,0.35); }
   .credit {
     position: fixed; top: 14px; right: 16px; z-index: 2;
     font: 500 11px/1.4 inherit; letter-spacing: 0.08em;
@@ -51,6 +58,7 @@
     font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     background: #f0f0f3; border-radius: 6px; padding: 2px 6px; white-space: nowrap;
   }
+  tr td code.attr { background: #eef4ff; color: #2563eb; }
 
   /* ---- 变体卡片 ---- */
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; margin-top: 20px; }
@@ -59,7 +67,8 @@
     position: relative; height: 300px; border-radius: 22px; overflow: hidden;
     background: #0d0d0d; border: 1px solid #e4e4e8;
   }
-  .stage glass-light-toggle { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .stage.light-bg { background: #f1f1f3; }
+  .stage glass-toggle { position: absolute; inset: 0; width: 100%; height: 100%; }
   figcaption { margin-top: 10px; font-size: 13px; color: #6e6e73; line-height: 1.6; }
   figcaption code { font: 12px/1.5 ui-monospace, Menlo, monospace; background: #f0f0f3; padding: 1px 6px; border-radius: 6px; }
 
@@ -72,9 +81,10 @@
 </head>
 <body>
 
-<!-- ===================== 1:1 复刻区（组件铺满首屏） ===================== -->
+<!-- ===================== 首屏：日/夜预设（1:1 保留原版观感） ===================== -->
 <section class="hero">
-  <glass-light-toggle id="hero"></glass-light-toggle>
+  <glass-toggle id="hero" preset="day-night"></glass-toggle>
+  <div class="chip">preset="day-night"</div>
   <a class="credit" href="https://experiments.thisiswhitespace.com/glass-light-toggle" target="_blank" rel="noopener">原作实验：Glass Light Toggle · Zsolt Kacso</a>
   <div class="scroll-cue">↓ 组件用法</div>
 </section>
@@ -82,53 +92,75 @@
 <!-- ===================== 用法文档 ===================== -->
 <section class="docs">
   <div class="docs-inner">
-    <h1><code>&lt;glass-light-toggle&gt;</code></h1>
+    <h1><code>&lt;glass-toggle&gt;</code></h1>
     <p class="sub">
-      玻璃质感日/夜开关 —— 对 experiments.thisiswhitespace.com/glass-light-toggle 的一比一复刻。
-      零依赖 Web Component：像素图标在 CPU 上做弹簧模拟并光栅化为纹理，玻璃折射、磨砂与 LED 散射全部由单个
-      WebGL2 片元着色器完成。支持点击、拖拽、键盘操作，可受控使用。
+      玻璃质感<b>通用二态开关</b> —— 由日夜专用组件泛化而来，玻璃折射、磨砂与 LED 散射光学 1:1 保留。
+      默认即中性通用形态：深色圆角底板（可嵌任意页面背景）+ 点阵电源符 + 绿(开)/灰(关)灯光；
+      首屏的日/夜场景只是一条 <code>preset="day-night"</code> 预设。零依赖 Web Component，支持点击、拖拽、键盘与受控使用。
     </p>
 
     <h2>快速开始</h2>
-<pre><code>&lt;<span class="t">script</span> <span class="a">type</span>=<span class="a">"module"</span> <span class="a">src</span>=<span class="a">"./glass-light-toggle.js"</span>&gt;&lt;/<span class="t">script</span>&gt;
+<pre><code>&lt;<span class="t">script</span> <span class="a">type</span>=<span class="a">"module"</span> <span class="a">src</span>=<span class="a">"./glass-toggle.js"</span>&gt;&lt;/<span class="t">script</span>&gt;
 
-<span class="c">&lt;!-- 默认尺寸建议不小于 480×320，四周留白用于光晕 --&gt;</span>
-&lt;<span class="t">glass-light-toggle</span> <span class="a">style</span>=<span class="a">"width:560px;height:400px"</span>&gt;&lt;/<span class="t">glass-light-toggle</span>&gt;</code></pre>
+<span class="c">&lt;!-- 通用默认：plinth 底板 + 电源符，任意页面直接放 --&gt;</span>
+&lt;<span class="t">glass-toggle</span> <span class="a">style</span>=<span class="a">"width:560px;height:360px"</span>&gt;&lt;/<span class="t">glass-toggle</span>&gt;
 
-    <h2>可配置示例</h2>
+<span class="c">&lt;!-- 日/夜场景预设：全屏环境底 + 页面明暗联动 --&gt;</span>
+&lt;<span class="t">glass-toggle</span> <span class="a">preset</span>=<span class="a">"day-night"</span> <span class="a">style</span>=<span class="a">"width:100vw;height:100vh"</span>&gt;&lt;/<span class="t">glass-toggle</span>&gt;</code></pre>
+
+    <h2>变体一览</h2>
     <div class="grid">
       <figure class="card">
-        <div class="stage"><glass-light-toggle style="height:300px"></glass-light-toggle></div>
-        <figcaption>默认：光带贴着玻璃把手环绕（<code>path="glass"</code>，宽 300px 自适应）</figcaption>
+        <div class="stage light-bg"><glass-toggle id="sw1" style="height:300px"></glass-toggle></div>
+        <div class="status-row"><span>默认通用形态（下方是浅色页面）：</span><b id="sw1-state">关</b></div>
+        <figcaption>开箱默认：<code>surface="plinth"</code> + <code>power</code> 图标 + 绿/灰灯光 + 固定暗表面</figcaption>
       </figure>
 
       <figure class="card">
-        <div class="stage"><glass-light-toggle path="track" style="height:300px"></glass-light-toggle></div>
-        <figcaption><code>path="track"</code>：光带改沿容器内壁环绕一周</figcaption>
+        <div class="stage"><glass-toggle preset="day-night" style="height:300px"></glass-toggle></div>
+        <figcaption><code>preset="day-night"</code>：场景底色 + 表面随开关明暗（首屏同款）</figcaption>
       </figure>
 
       <figure class="card">
-        <div class="stage"><glass-light-toggle moon-color="#8b5cf6" sun-color="#f43f5e" style="height:300px"></glass-light-toggle></div>
-        <figcaption><code>moon-color</code> / <code>sun-color</code>：自定义夜/昼两态的灯光颜色</figcaption>
+        <div class="stage"><glass-toggle off-icon="play" on-icon="pause" on-color="#60a5fa" style="height:300px"></glass-toggle></div>
+        <figcaption>内置图标对 + 自定义开态灯光色（<code>play</code>/<code>pause</code>/<code>bell</code>/<code>lock</code>/<code>heart</code>/<code>wifi</code>…）</figcaption>
       </figure>
 
       <figure class="card">
-        <div class="stage"><glass-light-toggle id="sw1" style="height:300px"></glass-light-toggle></div>
-        <div class="status-row"><span>受控读取 <code>change</code> 事件：</span><b id="sw1-state">关（月亮）</b></div>
-        <figcaption>通过 <code>checked</code> 属性 / <code>checked</code> 特性双向受控</figcaption>
+        <div class="stage"><glass-toggle off-icon="🌙" on-icon="☀️" style="height:300px"></glass-toggle></div>
+        <figcaption>任意 emoji 自动采样成点阵图标（字形随平台字体略有差异）</figcaption>
+      </figure>
+
+      <figure class="card">
+        <div class="stage"><glass-toggle off-icon="...###.../...###.../...###.../#########/.#######./..#####../...###.../....#...." on-icon="....#..../...###.../..#####../.#######./#########/...###.../...###.../...###..." on-color="#f59e0b" style="height:300px"></glass-toggle></div>
+        <figcaption>像素串自定义图标：<code>#</code> 亮、<code>+</code> 半亮、<code>*</code> 闪烁，自动居中</figcaption>
+      </figure>
+
+      <figure class="card">
+        <div class="stage light-bg"><glass-toggle theme="light" path="track" on-icon="check" off-icon="power" on-color="#10b981" style="height:300px"></glass-toggle></div>
+        <figcaption><code>theme="light"</code> 固定亮表面 + <code>path="track"</code> 光带沿容器内壁环绕</figcaption>
+      </figure>
+
+      <figure class="card">
+        <div class="stage"><glass-toggle disabled style="height:300px"></glass-toggle></div>
+        <figcaption><code>disabled</code>：灯光转暗、禁用点击/拖拽/键盘，带 <code>aria-disabled</code></figcaption>
       </figure>
     </div>
 
     <h2>属性（Attributes）</h2>
     <table>
-      <tr><th>属性</th><th>类型</th><th>默认</th><th>说明</th></tr>
-      <tr><td><code>checked</code></td><td>boolean</td><td>false</td><td>初始/受控状态；true 为「开」（太阳）。JS 内外修改均会生效并反映回特性</td></tr>
-      <tr><td><code>path</code></td><td>"glass" | "track"</td><td>"glass"</td><td>光带路径：贴把手环绕，或沿容器内壁环绕</td></tr>
-      <tr><td><code>zoom</code></td><td>number</td><td>1</td><td>相对自适应尺寸的放大倍数（最小 0.5）</td></tr>
-      <tr><td><code>moon-color</code></td><td>#rrggbb</td><td>#6f86ff</td><td>夜（月亮）状态灯光颜色</td></tr>
-      <tr><td><code>sun-color</code></td><td>#rrggbb</td><td>#ffa82e</td><td>昼（太阳）状态灯光颜色</td></tr>
-      <tr><td><code>hint</code></td><td>string</td><td>自动</td><td>底部提示文字；缺省自动为 Click or drag / Tap or drag；设为 <code>"none"</code> 隐藏</td></tr>
-      <tr><td><code>label</code></td><td>string</td><td>—</td><td>无障碍 aria-label</td></tr>
+      <tr><th>属性</th><th>类型</th><th>通用默认</th><th>说明</th></tr>
+      <tr><td><code class="attr">checked</code></td><td>boolean</td><td>false</td><td>初始/受控状态；JS 内外修改均生效并反映回特性</td></tr>
+      <tr><td><code class="attr">on-icon</code> / <code class="attr">off-icon</code></td><td>string</td><td><code>power</code> / <code>power</code></td><td>开/关态图标：内置名、像素串或 1–2 字符 emoji</td></tr>
+      <tr><td><code class="attr">on-color</code> / <code class="attr">off-color</code></td><td>#rrggbb</td><td><code>#34d399</code> / <code>#7c8598</code></td><td>开/关态灯光颜色</td></tr>
+      <tr><td><code class="attr">theme</code></td><td>"auto"|"dark"|"light"</td><td><code>dark</code></td><td>表面明暗：固定，或 <code>auto</code> 跟随开关位置（日/夜行为）</td></tr>
+      <tr><td><code class="attr">surface</code></td><td>"plinth"|"scene"</td><td><code>plinth</code></td><td>圆角底板+透明羽化边（可嵌任意页面）；或全场景环境底色</td></tr>
+      <tr><td><code class="attr">preset</code></td><td>"day-night"</td><td>—</td><td>一键日/夜：scene + auto + sun/moon + 琥珀/月蓝；显式属性优先</td></tr>
+      <tr><td><code class="attr">disabled</code></td><td>boolean</td><td>false</td><td>禁用交互、灯光转暗</td></tr>
+      <tr><td><code class="attr">path</code></td><td>"glass"|"track"</td><td>"glass"</td><td>光带路径：贴把手环绕 / 沿容器内壁环绕</td></tr>
+      <tr><td><code class="attr">zoom</code></td><td>number</td><td>1</td><td>相对自适应尺寸的放大倍数（最小 0.5）</td></tr>
+      <tr><td><code class="attr">hint</code></td><td>string</td><td>自动</td><td>底部提示文字；<code>"none"</code> 隐藏</td></tr>
+      <tr><td><code class="attr">label</code></td><td>string</td><td>—</td><td>无障碍 aria-label</td></tr>
     </table>
 
     <h2>属性（Properties / 方法）与事件</h2>
@@ -136,8 +168,8 @@
       <tr><th>成员</th><th>说明</th></tr>
       <tr><td><code>el.checked: boolean</code></td><td>读写当前开关状态</td></tr>
       <tr><td><code>el.toggle()</code></td><td>切换开关</td></tr>
-      <tr><td><code>change</code> 事件</td><td>用户或程序切换后触发，<code>detail.checked</code> 为新状态；可组合、可冒泡</td></tr>
-      <tr><td><code>themechange</code> 事件</td><td>页面明暗主题跨界（滑过中点）时触发，<code>detail.lit</code> 为是否进入亮色</td></tr>
+      <tr><td><code>change</code> 事件</td><td>切换后触发，<code>detail.checked</code> 为新状态；可组合、可冒泡</td></tr>
+      <tr><td><code>themechange</code> 事件</td><td>仅 <code>theme="auto"</code>：表面明暗跨界（滑过中点）时触发，<code>detail.lit</code></td></tr>
     </table>
 
     <h2>交互</h2>
@@ -148,37 +180,46 @@
     </p>
 
     <h2>在框架中使用</h2>
-<pre><code><span class="c">// React 18+（事件用原生 addEventListener 或 onGltChange 均可，CustomEvent 不走合成事件）</span>
-<span class="t">import</span> <span class="a">"./glass-light-toggle.js"</span>;
+<pre><code><span class="c">// React 18+（CustomEvent 不走合成事件，用原生 addEventListener）</span>
+<span class="t">import</span> <span class="a">"./glass-toggle.js"</span>;
 
-&lt;<span class="t">glass-light-toggle</span> <span class="a">ref</span>={ref} /&gt;
+&lt;<span class="t">glass-toggle</span> <span class="a">ref</span>={ref} /&gt;
 useEffect(() =&gt; {
   const el = ref.current;
   const onChange = e =&gt; setChecked(e.detail.checked);
   el.addEventListener(<span class="a">"change"</span>, onChange);
   <span class="t">return</span> () =&gt; el.removeEventListener(<span class="a">"change"</span>, onChange);
 }, []);</code></pre>
-<pre><code><span class="c">&lt;!-- Vue 3：在 main.js 里 import 一次即可，kebab-case 属性直接使用 --&gt;</span>
-&lt;<span class="t">glass-light-toggle</span> <span class="a">:checked</span>=<span class="a">"on"</span> @<span class="a">change</span>=<span class="a">"on = $event.detail.checked"</span> /&gt;</code></pre>
+<pre><code><span class="c">&lt;!-- Vue 3：main.js 里 import 一次即可 --&gt;</span>
+&lt;<span class="t">glass-toggle</span> <span class="a">:checked</span>=<span class="a">"on"</span> @<span class="a">change</span>=<span class="a">"on = $event.detail.checked"</span> /&gt;</code></pre>
+
+    <h2>从 glass-light-toggle 迁移</h2>
+    <table>
+      <tr><th>旧（glass-light-toggle）</th><th>新（glass-toggle）</th></tr>
+      <tr><td><code>&lt;glass-light-toggle&gt;</code></td><td><code>&lt;glass-toggle preset="day-night"&gt;</code>（观感一致）</td></tr>
+      <tr><td><code>moon-color</code> / <code>sun-color</code></td><td><code>off-color</code> / <code>on-color</code></td></tr>
+      <tr><td>默认全屏场景 + 页面明暗联动</td><td>默认为通用形态；场景与联动改为 <code>preset="day-night"</code> 或 <code>surface="scene" theme="auto"</code></td></tr>
+      <tr><td><code>change</code> / <code>themechange</code> / 拖拽 / 键盘 / <code>zoom</code> / <code>hint</code> / <code>label</code> / <code>path</code></td><td>不变</td></tr>
+    </table>
 
     <p class="foot">
       设计与原始实现：Zsolt Kacso（<a href="https://experiments.thisiswhitespace.com/glass-light-toggle" target="_blank" rel="noopener">experiments.thisiswhitespace.com/glass-light-toggle</a>）。<br>
-      本目录为其 Web Component 化移植，仅供学习与内部使用；需要浏览器支持 WebGL2。请通过本地 HTTP 服务打开本页（如 <span class="inline-code">python3 -m http.server</span>）。
+      本目录为其 Web Component 化移植与通用化改造，仅供学习与内部使用；需要浏览器支持 WebGL2。请通过本地 HTTP 服务打开本页（如 <span class="inline-code">python3 -m http.server</span>）。
     </p>
   </div>
 </section>
 
 <script type="module">
-  import './glass-light-toggle.js';
+  import './glass-toggle.js';
 
   // 受控示例：读取 change 事件
   const sw1 = document.getElementById('sw1');
   const sw1State = document.getElementById('sw1-state');
   sw1.addEventListener('change', e => {
-    sw1State.textContent = e.detail.checked ? '开（太阳）' : '关（月亮）';
+    sw1State.textContent = e.detail.checked ? '开' : '关';
   });
 
-  // 首屏角落文字随主题变色（与组件内提示一致的呼吸感）
+  // 首屏角落文字随日/夜预设的表面明暗变色
   const hero = document.getElementById('hero');
   hero.addEventListener('themechange', e => {
     document.body.classList.toggle('light', e.detail.lit);
