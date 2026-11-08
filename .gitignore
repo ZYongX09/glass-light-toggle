@@ -1,0 +1,13 @@
+# 本地工具缓存
+.mimosa/
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# 依赖与构建产物（本组件无依赖，防御性忽略）
+node_modules/
+dist/

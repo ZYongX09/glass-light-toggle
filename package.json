@@ -1,0 +1,26 @@
+{
+  "name": "glass-light-toggle",
+  "version": "1.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "玻璃质感日/夜开关 Web Component —— 1:1 复刻 experiments.thisiswhitespace.com/glass-light-toggle（原作 Zsolt Kacso）",
+  "type": "module",
+  "main": "glass-light-toggle.js",
+  "module": "glass-light-toggle.js",
+  "exports": {
+    ".": "./glass-light-toggle.js"
+  },
+  "files": [
+    "glass-light-toggle.js",
+    "index.html",
+    "README.md"
+  ],
+  "keywords": [
+    "web-component",
+    "toggle",
+    "switch",
+    "glass",
+    "webgl",
+    "dark-mode"
+  ]
+}
