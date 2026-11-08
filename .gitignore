@@ -1,6 +1,10 @@
 # 本地工具缓存
 .mimosa/
 
+# Worker 静态资源（worker/build.sh 生成）
+worker/public/
+worker/.wrangler/
+
 # 系统与编辑器
 .DS_Store
 Thumbs.db

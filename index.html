@@ -61,7 +61,7 @@
   tr td code.attr { background: #eef4ff; color: #2563eb; }
 
   /* ---- 变体卡片 ---- */
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; margin-top: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 22px; margin-top: 20px; }
   figure.card { margin: 0; }
   .stage {
     position: relative; height: 300px; border-radius: 22px; overflow: hidden;
@@ -77,6 +77,26 @@
 
   .foot { margin-top: 56px; font-size: 12.5px; color: #98989d; line-height: 1.8; }
   .foot a { color: inherit; }
+
+  /* ---- 表格横向滚动（窄屏不破版） ---- */
+  .tw { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tw table { min-width: 560px; }
+
+  /* ---- 移动端 ---- */
+  @media (max-width: 640px) {
+    .hero { height: 100svh; }
+    .docs { padding: 44px 14px 72px; }
+    .docs h1 { font-size: 22px; }
+    .docs h2 { font-size: 17px; margin-top: 36px; }
+    .docs .sub { font-size: 14px; margin-bottom: 28px; }
+    .docs p { font-size: 14px; }
+    pre { font-size: 11.5px; padding: 13px 14px; border-radius: 12px; }
+    .grid { gap: 16px; }
+    .stage { height: 230px; border-radius: 18px; }
+    .chip, .credit, .scroll-cue { font-size: 10px; }
+    .credit { max-width: 44vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .status-row { font-size: 12.5px; }
+  }
 </style>
 </head>
 <body>
@@ -148,7 +168,7 @@
     </div>
 
     <h2>属性（Attributes）</h2>
-    <table>
+    <div class="tw"><table>
       <tr><th>属性</th><th>类型</th><th>通用默认</th><th>说明</th></tr>
       <tr><td><code class="attr">checked</code></td><td>boolean</td><td>false</td><td>初始/受控状态；JS 内外修改均生效并反映回特性</td></tr>
       <tr><td><code class="attr">on-icon</code> / <code class="attr">off-icon</code></td><td>string</td><td><code>power</code> / <code>power</code></td><td>开/关态图标：内置名、像素串或 1–2 字符 emoji</td></tr>
@@ -161,16 +181,16 @@
       <tr><td><code class="attr">zoom</code></td><td>number</td><td>1</td><td>相对自适应尺寸的放大倍数（最小 0.5）</td></tr>
       <tr><td><code class="attr">hint</code></td><td>string</td><td>自动</td><td>底部提示文字；<code>"none"</code> 隐藏</td></tr>
       <tr><td><code class="attr">label</code></td><td>string</td><td>—</td><td>无障碍 aria-label</td></tr>
-    </table>
+    </table></div>
 
     <h2>属性（Properties / 方法）与事件</h2>
-    <table>
+    <div class="tw"><table>
       <tr><th>成员</th><th>说明</th></tr>
       <tr><td><code>el.checked: boolean</code></td><td>读写当前开关状态</td></tr>
       <tr><td><code>el.toggle()</code></td><td>切换开关</td></tr>
       <tr><td><code>change</code> 事件</td><td>切换后触发，<code>detail.checked</code> 为新状态；可组合、可冒泡</td></tr>
       <tr><td><code>themechange</code> 事件</td><td>仅 <code>theme="auto"</code>：表面明暗跨界（滑过中点）时触发，<code>detail.lit</code></td></tr>
-    </table>
+    </table></div>
 
     <h2>交互</h2>
     <p>
@@ -194,13 +214,13 @@ useEffect(() =&gt; {
 &lt;<span class="t">glass-toggle</span> <span class="a">:checked</span>=<span class="a">"on"</span> @<span class="a">change</span>=<span class="a">"on = $event.detail.checked"</span> /&gt;</code></pre>
 
     <h2>从 glass-light-toggle 迁移</h2>
-    <table>
+    <div class="tw"><table>
       <tr><th>旧（glass-light-toggle）</th><th>新（glass-toggle）</th></tr>
       <tr><td><code>&lt;glass-light-toggle&gt;</code></td><td><code>&lt;glass-toggle preset="day-night"&gt;</code>（观感一致）</td></tr>
       <tr><td><code>moon-color</code> / <code>sun-color</code></td><td><code>off-color</code> / <code>on-color</code></td></tr>
       <tr><td>默认全屏场景 + 页面明暗联动</td><td>默认为通用形态；场景与联动改为 <code>preset="day-night"</code> 或 <code>surface="scene" theme="auto"</code></td></tr>
       <tr><td><code>change</code> / <code>themechange</code> / 拖拽 / 键盘 / <code>zoom</code> / <code>hint</code> / <code>label</code> / <code>path</code></td><td>不变</td></tr>
-    </table>
+    </table></div>
 
     <p class="foot">
       设计与原始实现：Zsolt Kacso（<a href="https://experiments.thisiswhitespace.com/glass-light-toggle" target="_blank" rel="noopener">experiments.thisiswhitespace.com/glass-light-toggle</a>）。<br>

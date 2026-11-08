@@ -1,0 +1,24 @@
+/**
+ * glass-light-switch — glass-toggle 组件演示的静态托管 Worker
+ *
+ * 借用 ABDL Space 项目域名，演示页挂载在：
+ *   https://abdl-space.top/projects/light-switch
+ *
+ * assets-only（无 Worker 脚本）：路由比主站任何通配更具体，Cloudflare 按最具体匹配，
+ * 不影响 abdl-space.top 既有流量。public/ 由 build.sh 从仓库根目录生成，勿手改。
+ *
+ * 部署：bash build.sh && wrangler deploy
+ */
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "glass-light-switch",
+  "account_id": "c5a9726ee4c59c70d9261881af33ca87",
+  "compatibility_date": "2026-11-01",
+  "routes": [
+    { "pattern": "abdl-space.top/projects/light-switch", "zone_name": "abdl-space.top" },
+    { "pattern": "abdl-space.top/projects/light-switch/*", "zone_name": "abdl-space.top" }
+  ],
+  "assets": {
+    "directory": "./public"
+  }
+}

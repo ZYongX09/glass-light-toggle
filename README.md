@@ -17,7 +17,23 @@ python3 -m http.server 8080
 # 浏览器打开 http://127.0.0.1:8080
 ```
 
-演示页首屏是 `preset="day-night"` 的全屏日/夜场景（与原版观感一致），下方为通用形态与各变体、API 文档、迁移表。
+**线上演示**（ABDL Space 域名下的 Worker 静态托管）：
+[https://abdl-space.top/projects/light-switch](https://abdl-space.top/projects/light-switch)
+
+演示页首屏是 `preset="day-night"` 的全屏日/夜场景（与原版观感一致），下方为通用形态与各变体、API 文档、迁移表。已做移动端优化：窄屏单列卡片、表格横向滚动、组件画布 `touch-action: pan-y`（竖向滑动交给页面滚动，横向拖拽仍控制把手）。
+
+## 部署（Cloudflare Worker）
+
+`worker/` 是一个 assets-only Worker（无脚本，仅静态资源），借用 ABDL Space 项目域名：
+
+```bash
+cd worker
+bash build.sh        # 从仓库根目录装配 public/projects/light-switch/
+wrangler deploy      # 绑定路由 abdl-space.top/projects/light-switch(/*)
+```
+
+- 路由比主站任何 `/*` 通配更具体（Cloudflare 最具体匹配），不影响主站既有流量
+- `worker/public/` 为构建产物，已 gitignore；改完根目录文件后重跑 `build.sh && wrangler deploy`
 
 ## 快速开始
 

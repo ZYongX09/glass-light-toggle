@@ -526,7 +526,8 @@ const SHADOW_CSS = `
   :host([hidden]) { display: none; }
   canvas {
     position: absolute; inset: 0; width: 100%; height: 100%; display: block;
-    touch-action: none; -webkit-tap-highlight-color: transparent;
+    /* pan-y：触屏竖向滑动交给页面滚动，横向拖拽仍由组件接管（把手拖动是横向为主） */
+    touch-action: pan-y; -webkit-tap-highlight-color: transparent;
   }
   canvas { overscroll-behavior: none; -webkit-user-select: none; user-select: none; }
   canvas:focus-visible { outline: 2px solid rgba(128, 128, 128, 0.65); outline-offset: 6px; }
