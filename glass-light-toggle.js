@@ -363,6 +363,7 @@ export class GlassLightToggle extends HTMLElement {
     this._PIX = pairUp();
     this._lit = false;
     this._connected = false;
+    this._visible = true; // IntersectionObserver 报告前先乐观假设可见
     this._raf = 0;
     this._lastT = performance.now();
 
@@ -386,6 +387,21 @@ export class GlassLightToggle extends HTMLElement {
     this._bindInput();
     this._ro = new ResizeObserver(() => this._resize());
     this._ro.observe(this);
+    // 视口外的实例暂停整个渲染循环（多实例页面只给可见实例花 GPU/ CPU）
+    this._io = new IntersectionObserver(entries => {
+      const vis = entries.some(e => e.isIntersecting);
+      if (vis === this._visible) return;
+      this._visible = vis;
+      if (vis) {
+        if (this._connected && this._gl) {
+          this._lastT = performance.now();
+          this._raf = requestAnimationFrame(t => this._frame(t));
+        }
+      } else {
+        cancelAnimationFrame(this._raf);
+      }
+    }, { rootMargin: '120px' });
+    this._io.observe(this);
   }
 
   // ---------------------------------------------------------------- public API
@@ -401,8 +417,10 @@ export class GlassLightToggle extends HTMLElement {
     this._connected = true;
     this._applyLabel();
     this._resize();
-    this._lastT = performance.now();
-    this._raf = requestAnimationFrame(t => this._frame(t));
+    if (this._visible && this._gl) {
+      this._lastT = performance.now();
+      this._raf = requestAnimationFrame(t => this._frame(t));
+    }
   }
 
   disconnectedCallback() {
@@ -631,7 +649,7 @@ export class GlassLightToggle extends HTMLElement {
 
   // ---------------------------------------------------------------- frame loop
   _frame(now) {
-    if (this._connected) this._raf = requestAnimationFrame(t => this._frame(t));
+    if (this._connected && this._visible) this._raf = requestAnimationFrame(t => this._frame(t));
     if (!this._gl) return;
 
     const dt = Math.min(1 / 30, (now - this._lastT) / 1000);
